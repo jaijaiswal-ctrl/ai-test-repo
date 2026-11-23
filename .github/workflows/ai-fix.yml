@@ -1,0 +1,50 @@
+name: ai-fix
+
+# Agent tab chalta hai jab kisi issue pe 'ai-fix' label lagta hai
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  fix:
+    # Sirf 'ai-fix' label, aur sirf repo ke owner ke lagane par
+    if: github.event.label.name == 'ai-fix' && github.event.sender.login == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # Ek hi issue pe do run ek saath nahi
+    concurrency:
+      group: ai-fix-${{ github.event.issue.number }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Agent ka code lao (private repo)
+        uses: actions/checkout@v4
+        with:
+          repository: jaijaiswal-ctrl/project-nexus
+          token: ${{ secrets.AGENT_GITHUB_TOKEN }}
+          path: agent
+
+      - name: Python lagao
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Libraries install karo
+        run: pip install -r agent/requirements-agent.txt
+
+      - name: Agent chalao
+        working-directory: agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.AGENT_GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          AGENT_MODEL: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+        # Exit code 2 = PR bani par reviewer ne approve nahi kiya.
+        # Exit code 3 = PR nahi bani, insaan dekhe. Dono "kaam fail" nahi hain.
+        # Baaki (jaise 1) asli error hain, tab run laal hoga.
+        run: |
+          python github_agent.py --repo "${{ github.repository }}" --issue ${{ github.event.issue.number }} --comment || code=$?
+          if [ "${code:-0}" -ne 0 ] && [ "${code:-0}" -ne 2 ] && [ "${code:-0}" -ne 3 ]; then
+            exit "$code"
+          fi
