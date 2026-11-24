@@ -1,3 +1,4 @@
+
 name: ai-fix
 
 # Agent tab chalta hai jab kisi issue pe 'ai-fix' label lagta hai
@@ -40,11 +41,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.AGENT_GITHUB_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           AGENT_MODEL: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
-        # Exit code 2 = PR bani par reviewer ne approve nahi kiya.
-        # Exit code 3 = PR nahi bani, insaan dekhe. Dono "kaam fail" nahi hain.
-        # Baaki (jaise 1) asli error hain, tab run laal hoga.
+        # Exit code 0  = PR bani aur reviewer ne approve kiya.
+        # Exit code 10 = PR bani par reviewer ne approve nahi kiya.
+        # Exit code 11 = PR nahi bani, insaan dekhe.
+        # In teeno me run hara rahega. Baaki sab (jaise 1 ya 2) asli error hain, tab run laal hoga.
         run: |
           python github_agent.py --repo "${{ github.repository }}" --issue ${{ github.event.issue.number }} --comment || code=$?
-          if [ "${code:-0}" -ne 0 ] && [ "${code:-0}" -ne 2 ] && [ "${code:-0}" -ne 3 ]; then
+          echo "Agent exit code: ${code:-0}"
+          if [ "${code:-0}" -ne 0 ] && [ "${code:-0}" -ne 10 ] && [ "${code:-0}" -ne 11 ]; then
             exit "$code"
           fi
